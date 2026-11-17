@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Surrey Opticians Secret Santa</title>
+<meta property="og:title" content="🎅 Surrey Opticians Secret Santa">
+<meta property="og:description" content="Your private Secret Santa link. Tap to reveal who you're buying for.">
+<!--
+  Surrey Opticians Secret Santa — open source (MIT licence).
+  One self-contained file. No server, no database, no logins, no tracking.
+  The organiser view draws the names in the browser and makes one link per person.
+  Each link carries that person's match inside the part after "#", which browsers never
+  send to the web server, so the host never sees who drew whom.
+  Note: the match is scrambled, not strongly encrypted, so it's private enough for an
+  office Secret Santa but not a vault.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#173559; --navy-900:#0b1b2f; --indigo:#2a245a; --teal:#00a0b4; --teal-600:#0090a4;
+    --teal-700:#007d8f; --teal-050:#eaf8fa; --blue:#6e86c4; --cream:#f3f1ee; --ink:#1b2733;
+    --grey-200:#dde0e3; --grey-300:#c5cad0; --grey-500:#6e757f; --danger:#c8453b; --success:#2e8b57;
+    --wa:#25d366;
+    --radius:12px; --shadow:0 6px 18px rgba(11,27,47,.09); --shadow-lg:0 16px 40px rgba(11,27,47,.18);
+    --font:'Mulish','Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{font-family:var(--font);color:var(--ink);background:var(--cream);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .hidden{display:none!important}
+  h1,h2,h3{font-weight:300;letter-spacing:-.01em;line-height:1.15;margin:0}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--teal)}
+  button{font-family:inherit}
+
+  /* ---------- Header ---------- */
+  header.top{background:var(--navy);color:#fff;padding:28px 20px 70px;position:relative;overflow:hidden;text-align:center}
+  header.top h1{font-size:clamp(28px,5vw,40px)}
+  header.top p{color:rgba(255,255,255,.75);margin:8px auto 0;max-width:520px}
+  .wave{position:absolute;left:0;right:0;bottom:-1px;height:56px}
+  .snow{position:absolute;inset:0;pointer-events:none}
+  .snow i{position:absolute;top:-10px;width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.7);animation:fall linear infinite}
+  @keyframes fall{to{transform:translateY(420px) translateX(20px)}}
+
+  main{max-width:760px;margin:-40px auto 40px;padding:0 16px;position:relative}
+  .card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:18px}
+  .card h2{font-size:24px;color:var(--navy);margin-bottom:6px}
+  .muted{color:var(--grey-500);font-size:14px}
+  label{display:block;font-weight:700;font-size:14px;color:var(--navy);margin:16px 0 6px}
+  input,textarea{width:100%;font:inherit;font-size:16px;padding:11px 13px;border:1px solid var(--grey-300);border-radius:8px;background:#fff;color:var(--ink)}
+  input:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal)}
+  textarea{min-height:200px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:560px){.row{grid-template-columns:1fr}}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:999px;padding:12px 22px;font-weight:700;font-size:15px;cursor:pointer;text-decoration:none;transition:background .15s,transform .1s}
+  .btn:active{transform:scale(.98)}
+  .btn-primary{background:var(--teal);color:#fff}.btn-primary:hover{background:var(--teal-600)}
+  .btn-ghost{background:transparent;color:var(--navy);border:1px solid var(--grey-300)}.btn-ghost:hover{background:var(--teal-050)}
+  .btn-wa{background:var(--wa);color:#fff}.btn-wa:hover{background:#1fb457}
+  .btn-sm{padding:8px 14px;font-size:13px}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+  .alert{border-radius:8px;padding:12px 14px;font-size:14px;margin-top:14px}
+  .alert-warn{background:#fbe6d2;color:#7a3d05}
+  .alert-err{background:#f7dedb;color:#7d221b}
+  .alert-ok{background:#dff1e7;color:#1d5c39}
+  .count{font-size:13px;color:var(--grey-500);margin-top:6px}
+
+  .links{list-style:none;padding:0;margin:16px 0 0}
+  .links li{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--grey-200);flex-wrap:wrap}
+  .links li:first-child{border-top:0}
+  .avatar{width:38px;height:38px;border-radius:50%;background:var(--teal-050);color:var(--teal-700);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+  .who{flex:1;min-width:120px;font-weight:700;color:var(--navy)}
+  .who small{display:block;font-weight:400;color:var(--grey-500)}
+  .sent .avatar{background:#dff1e7;color:var(--success)}
+  details{margin-top:14px}
+  summary{cursor:pointer;font-weight:700;color:var(--teal-700)}
+  .pairs{font-size:14px;margin-top:10px}
+  .pairs input{margin-bottom:8px}
+
+  /* ---------- Reveal view ---------- */
+  body.reveal{background:radial-gradient(circle at 50% 0%,#24497a 0%,var(--navy) 45%,var(--navy-900) 100%);color:#fff;min-height:100vh}
+  .stage{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 20px;position:relative;overflow:hidden}
+  .stage h1{font-size:clamp(28px,7vw,44px);margin-top:10px}
+  .stage p{color:rgba(255,255,255,.78);max-width:420px;margin:12px auto 0}
+  .gift{width:190px;height:190px;margin:34px auto 10px;cursor:pointer;position:relative;border:0;background:none;padding:0;-webkit-tap-highlight-color:transparent}
+  .gift:focus-visible{outline:3px solid var(--teal);outline-offset:8px;border-radius:12px}
+  .gift .box{position:absolute;left:15px;right:15px;bottom:0;height:120px;background:var(--teal);border-radius:8px;box-shadow:var(--shadow-lg)}
+  .gift .lid{position:absolute;left:5px;right:5px;top:44px;height:36px;background:var(--teal-600);border-radius:8px;transition:transform .6s cubic-bezier(.16,1,.3,1),opacity .6s;box-shadow:0 4px 0 rgba(0,0,0,.08)}
+  .gift .ribbon-v{position:absolute;left:50%;width:26px;margin-left:-13px;top:44px;bottom:0;background:#fff}
+  .gift .lid .ribbon-v{top:0;bottom:0}
+  .gift .bow{position:absolute;left:50%;top:-30px;width:70px;margin-left:-35px;height:34px}
+  .gift .bow:before,.gift .bow:after{content:"";position:absolute;top:0;width:34px;height:30px;border:7px solid #fff;border-radius:50% 50% 50% 0}
+  .gift .bow:before{left:0;transform:rotate(-20deg)}.gift .bow:after{right:0;transform:scaleX(-1) rotate(-20deg)}
+  .gift.wiggle{animation:wiggle 2.4s ease-in-out infinite}
+  @keyframes wiggle{0%,80%,100%{transform:rotate(0)}84%{transform:rotate(-6deg)}88%{transform:rotate(6deg)}92%{transform:rotate(-4deg)}96%{transform:rotate(3deg)}}
+  .gift.open .lid{transform:translateY(-120px) rotate(-25deg);opacity:0}
+  .gift.open{animation:none}
+  .tap{font-size:14px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--teal)}
+  .result{animation:pop .7s cubic-bezier(.16,1,.3,1) both}
+  @keyframes pop{from{opacity:0;transform:scale(.7) translateY(20px)}to{opacity:1;transform:none}}
+  .result .name{font-size:clamp(44px,13vw,80px);font-weight:800;color:#fff;letter-spacing:-.02em;line-height:1;margin:14px 0 6px;text-shadow:0 6px 30px rgba(0,160,180,.5)}
+  .facts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+  .fact{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:8px 16px;font-size:14px}
+  .note{margin-top:22px;background:rgba(255,255,255,.08);border-radius:12px;padding:14px 18px;font-size:15px;max-width:420px}
+  .secret{margin-top:28px;font-size:13px;color:rgba(255,255,255,.6)}
+  .confirm{display:flex;gap:10px;justify-content:center;margin-top:26px;flex-wrap:wrap}
+  .confirm .btn-ghost{color:#fff;border-color:rgba(255,255,255,.35)}
+  .confirm .btn-ghost:hover{background:rgba(255,255,255,.08)}
+  .brand{position:absolute;bottom:18px;left:0;right:0;font-size:12px;color:rgba(255,255,255,.45);letter-spacing:.08em;text-transform:uppercase}
+  .confetti{position:fixed;inset:0;pointer-events:none;z-index:5}
+  .confetti i{position:absolute;top:-12px;width:8px;height:14px;border-radius:2px;animation:drop 2.8s cubic-bezier(.25,.6,.4,1) forwards}
+  @keyframes drop{to{transform:translateY(110vh) rotate(720deg);opacity:.9}}
+  footer.foot{text-align:center;font-size:12px;color:var(--grey-500);padding:0 16px 30px}
+  footer.foot a{color:var(--teal-700)}
+</style>
+</head>
+<body>
+
+<!-- ================= ORGANISER VIEW ================= -->
+<div id="organiser" class="hidden">
+  <header class="top">
+    <div class="snow" id="snow"></div>
+    <div class="eyebrow">Surrey Opticians · Coulsdon · Wallington · Banstead</div>
+    <h1>Secret Santa 🎅</h1>
+    <p>Draw names, then send each person their own private link on WhatsApp. Only they'll see who they're buying for, and that includes you.</p>
+    <svg class="wave" viewBox="0 0 1440 56" preserveAspectRatio="none"><path d="M0,28 C240,60 480,0 720,22 C960,44 1200,8 1440,30 L1440,56 L0,56 Z" fill="#f3f1ee"/></svg>
+  </header>
+
+  <main>
+    <!-- Step 1 -->
+    <section class="card" id="setup">
+      <div class="eyebrow">Step 1</div>
+      <h2>Who's taking part?</h2>
+      <p class="muted">One name per line. Add or remove people as needed.</p>
+      <label for="names">Participants</label>
+      <textarea id="names" spellcheck="false">Andy
+Atlanta
+Alex
+Ashru
+Ben
+Justyna
+Nicola
+Ivan
+Roop
+Sangeeta
+Shannon
+Susan
+Suzanne
+Nishi
+Fethi
+Morgan</textarea>
+      <div class="count" id="count"></div>
+
+      <div class="row">
+        <div>
+          <label for="budget">Spend limit</label>
+          <input id="budget" value="£10" placeholder="e.g. £10">
+        </div>
+        <div>
+          <label for="date">Gift exchange</label>
+          <input id="date" value="Christmas party" placeholder="e.g. Fri 19 Dec, Coulsdon">
+        </div>
+      </div>
+      <label for="msg">Note for everyone (optional)</label>
+      <input id="msg" placeholder="e.g. Wrap it, label it with their name, bring it to the party!">
+
+      <details>
+        <summary>Pairs who shouldn't draw each other (optional)</summary>
+        <div class="pairs">
+          <p class="muted">For example, partners or relatives. Write one pair per line, like <b>Andy, Ben</b>. Neither of them will draw the other.</p>
+          <textarea id="excl" style="min-height:80px" placeholder="Andy, Ben"></textarea>
+        </div>
+      </details>
+
+      <label for="base">Web address of this page</label>
+      <input id="base" placeholder="https://your-name.github.io/secret-santa/">
+      <p class="muted" id="baseHint">The links have to point at a public copy of this page. It fills in by itself once the page is online.</p>
+
+      <div id="setupErr" class="alert alert-err hidden"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="drawBtn">🎲 Draw names</button>
+      </div>
+    </section>
+
+    <!-- Step 2 -->
+    <section class="card hidden" id="results">
+      <div class="eyebrow">Step 2</div>
+      <h2>Send the links</h2>
+      <p class="muted">Tap <b>WhatsApp</b> next to each name and choose that person's chat. Every link only works for the person it belongs to, so don't post them in the group chat. You won't see any matches on this screen.</p>
+      <div id="fileWarn" class="alert alert-warn hidden">This page is open from a file on your computer, so the links won't open on anyone's phone. Put the page online first (see the README), then draw again from there.</div>
+      <ul class="links" id="linkList"></ul>
+      <div id="doneMsg" class="alert alert-ok hidden">Everyone's been sent their link. Merry Christmas! 🎄</div>
+      <div class="actions">
+        <button class="btn btn-ghost btn-sm" id="redrawBtn">↺ Start again &amp; redraw</button>
+      </div>
+      <p class="muted" style="margin-top:14px">This draw is saved in this browser, so you can close the page and come back to finish sending. If you redraw, all the old links stop matching the new draw, so you'd need to resend everyone's.</p>
+    </section>
+  </main>
+  <footer class="foot">Open source (MIT) · Runs entirely in your browser · No logins, no tracking, nothing stored on a server</footer>
+</div>
+
+<!-- ================= REVEAL VIEW ================= -->
+<div id="reveal" class="hidden">
+  <div class="stage">
+    <!-- step a: confirm identity -->
+    <div id="rvConfirm">
+      <div class="eyebrow">Surrey Opticians Secret Santa</div>
+      <h1>Hi <span class="rvGiver"></span>! 🎄</h1>
+      <p>This link is just for <b class="rvGiver"></b>. Is that you?</p>
+      <div class="confirm">
+        <button class="btn btn-primary" id="yesBtn">Yes, it's me</button>
+        <button class="btn btn-ghost" id="noBtn">No, it isn't</button>
+      </div>
+    </div>
+
+    <!-- step b: present -->
+    <div id="rvGift" class="hidden">
+      <div class="eyebrow">Surrey Opticians Secret Santa</div>
+      <h1>Your present is ready, <span class="rvGiver"></span></h1>
+      <p>Make sure nobody's looking over your shoulder 👀</p>
+      <button class="gift wiggle" id="gift" aria-label="Open the present to reveal your Secret Santa">
+        <span class="box"><span class="ribbon-v"></span></span>
+        <span class="lid"><span class="ribbon-v"></span><span class="bow"></span></span>
+      </button>
+      <div class="tap">Tap the present</div>
+    </div>
+
+    <!-- step c: result -->
+    <div id="rvResult" class="hidden result">
+      <div class="eyebrow">You're Secret Santa for</div>
+      <div class="name" id="rvRecipient"></div>
+      <div class="facts" id="rvFacts"></div>
+      <div class="note hidden" id="rvNote"></div>
+      <p class="secret">🤫 Keep it secret, and please don't forward this link.</p>
+    </div>
+
+    <!-- not you / error -->
+    <div id="rvNotYou" class="hidden">
+      <h1>No peeking! 🙈</h1>
+      <p>This link belongs to someone else. Please close it and let the organiser know it was sent to the wrong person.</p>
+    </div>
+    <div id="rvError" class="hidden">
+      <h1>Hmm, this link isn't working</h1>
+      <p>It may have been cut off when it was copied. Ask the organiser to send it again.</p>
+    </div>
+
+    <div class="brand">Surrey Opticians</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var STORE = "so-secret-santa-v1";
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------- token encoding (scramble, not strong encryption) ---------- */
+  function b64urlEncode(bytes){
+    var s = ""; for (var i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  }
+  function b64urlDecode(str){
+    str = str.replace(/-/g,"+").replace(/_/g,"/"); while (str.length % 4) str += "=";
+    var s = atob(str), out = new Uint8Array(s.length);
+    for (var i=0;i<s.length;i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+  function encodeToken(obj){
+    var data = new TextEncoder().encode(JSON.stringify(obj));
+    var key = new Uint8Array(8); crypto.getRandomValues(key);
+    var out = new Uint8Array(key.length + data.length);
+    out.set(key, 0);
+    for (var i=0;i<data.length;i++) out[key.length+i] = data[i] ^ key[i % key.length] ^ ((i*31) & 255);
+    return b64urlEncode(out);
+  }
+  function decodeToken(tok){
+    var raw = b64urlDecode(tok), key = raw.slice(0,8), data = raw.slice(8);
+    var plain = new Uint8Array(data.length);
+    for (var i=0;i<data.length;i++) plain[i] = data[i] ^ key[i % 8] ^ ((i*31) & 255);
+    return JSON.parse(new TextDecoder().decode(plain));
+  }
+
+  /* ---------- fair random helpers ---------- */
+  function randInt(n){ var a = new Uint32Array(1), lim = Math.floor(0x100000000 / n) * n, x;
+    do { crypto.getRandomValues(a); x = a[0]; } while (x >= lim); return x % n; }
+  function shuffle(arr){ arr = arr.slice(); for (var i=arr.length-1;i>0;i--){ var j=randInt(i+1), t=arr[i]; arr[i]=arr[j]; arr[j]=t; } return arr; }
+
+  /* Draw: random assignment where nobody gets themselves and no blocked pair happens. */
+  function draw(names, blocked){
+    for (var attempt=0; attempt<5000; attempt++){
+      var givers = shuffle(names), recv = shuffle(names), ok = true, map = {};
+      // try a random single loop first (feels more "Secret Santa"), then any valid derangement
+      if (attempt % 2 === 0){ for (var i=0;i<givers.length;i++) map[givers[i]] = givers[(i+1)%givers.length]; }
+      else { for (var k=0;k<givers.length;k++) map[givers[k]] = recv[k]; }
+      for (var g in map){ var r = map[g];
+        if (g === r || blocked[g+"\u0000"+r]) { ok = false; break; } }
+      if (ok) return map;
+    }
+    return null;
+  }
+
+  /* ---------- ROUTER ---------- */
+  var hash = location.hash.replace(/^#/,"");
+  if (hash) showReveal(hash); else showOrganiser();
+
+  /* ================= REVEAL ================= */
+  function showReveal(tok){
+    document.body.classList.add("reveal");
+    $("reveal").classList.remove("hidden");
+    var d;
+    try { d = decodeToken(decodeURIComponent(tok)); if (!d || !d.g || !d.r) throw 0; }
+    catch(e){ $("rvConfirm").classList.add("hidden"); $("rvError").classList.remove("hidden"); return; }
+
+    document.title = "🎅 Secret Santa for " + d.g;
+    Array.prototype.forEach.call(document.querySelectorAll(".rvGiver"), function(el){ el.textContent = d.g; });
+
+    $("noBtn").onclick = function(){ $("rvConfirm").classList.add("hidden"); $("rvNotYou").classList.remove("hidden"); };
+    $("yesBtn").onclick = function(){ $("rvConfirm").classList.add("hidden"); $("rvGift").classList.remove("hidden"); $("gift").focus(); };
+    $("gift").onclick = function(){
+      var g = $("gift"); if (g.classList.contains("open")) return;
+      g.classList.remove("wiggle"); g.classList.add("open");
+      setTimeout(function(){
+        $("rvGift").classList.add("hidden");
+        $("rvRecipient").textContent = d.r;
+        var facts = $("rvFacts");
+        if (d.b) facts.insertAdjacentHTML("beforeend", '<span class="fact">💷 Spend limit: <b></b></span>'), facts.lastChild.querySelector("b").textContent = d.b;
+        if (d.d) facts.insertAdjacentHTML("beforeend", '<span class="fact">📅 <b></b></span>'), facts.lastChild.querySelector("b").textContent = d.d;
+        if (d.m){ $("rvNote").textContent = d.m; $("rvNote").classList.remove("hidden"); }
+        $("rvResult").classList.remove("hidden");
+        confetti();
+      }, 550);
+    };
+  }
+
+  function confetti(){
+    var wrap = document.createElement("div"); wrap.className = "confetti";
+    var cols = ["#00a0b4","#6e86c4","#ffffff","#e2740e","#7fb325","#d4f0f4"];
+    for (var i=0;i<90;i++){
+      var p = document.createElement("i");
+      p.style.left = (Math.random()*100) + "vw";
+      p.style.background = cols[i % cols.length];
+      p.style.animationDelay = (Math.random()*0.8) + "s";
+      p.style.transform = "rotate(" + (Math.random()*360) + "deg)";
+      wrap.appendChild(p);
+    }
+    document.body.appendChild(wrap);
+    setTimeout(function(){ wrap.remove(); }, 4200);
+  }
+
+  /* ================= ORGANISER ================= */
+  function showOrganiser(){
+    $("organiser").classList.remove("hidden");
+    // snowfall
+    var snow = $("snow");
+    for (var i=0;i<28;i++){ var f = document.createElement("i");
+      f.style.left = Math.random()*100 + "%"; f.style.opacity = (0.3+Math.random()*0.6).toFixed(2);
+      var s = (3+Math.random()*4).toFixed(1); f.style.width = f.style.height = s + "px";
+      f.style.animationDuration = (6+Math.random()*8) + "s"; f.style.animationDelay = (-Math.random()*10) + "s";
+      snow.appendChild(f); }
+
+    var onWeb = /^https?:$/.test(location.protocol);
+    if (onWeb){ $("base").value = location.origin + location.pathname; $("baseHint").textContent = "Filled in from where this page is hosted. Leave it as it is."; }
+
+    $("names").addEventListener("input", updateCount); updateCount();
+    $("drawBtn").onclick = doDraw;
+    $("redrawBtn").onclick = function(){
+      if (!window.confirm("Start again? Every link you've already sent will stop matching, so you'll need to resend everyone's.")) return;
+      save(null); $("results").classList.add("hidden"); $("setup").classList.remove("hidden"); window.scrollTo(0,0);
+    };
+
+    var saved = load();
+    if (saved) renderLinks(saved);
+  }
+
+  function parseNames(){
+    var seen = {}, out = [], dup = [];
+    $("names").value.split(/\n|,/).forEach(function(n){
+      n = n.trim().replace(/\s+/g," "); if (!n) return;
+      var k = n.toLowerCase(); if (seen[k]) { dup.push(n); return; } seen[k] = 1; out.push(n);
+    });
+    return { names: out, dup: dup };
+  }
+  function updateCount(){ var p = parseNames(); $("count").textContent = p.names.length + " people" + (p.dup.length ? " · duplicate removed: " + p.dup.join(", ") : ""); }
+
+  function doDraw(){
+    var err = $("setupErr"); err.classList.add("hidden");
+    var p = parseNames(), names = p.names;
+    if (names.length < 3){ return showErr("You need at least 3 people for a Secret Santa."); }
+    var base = $("base").value.trim();
+    if (!/^https?:\/\//i.test(base)) { return showErr("Add the web address where this page is hosted (it starts with https://). The README explains how to get one for free."); }
+    base = base.split("#")[0];
+
+    var lower = {}; names.forEach(function(n){ lower[n.toLowerCase()] = n; });
+    var blocked = {}, bad = [];
+    $("excl").value.split("\n").forEach(function(line){
+      if (!line.trim()) return;
+      var parts = line.split(/,|&| and /i).map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
+      if (parts.length !== 2 || !lower[parts[0]] || !lower[parts[1]]) { bad.push(line.trim()); return; }
+      var a = lower[parts[0]], b = lower[parts[1]];
+      blocked[a+"\u0000"+b] = blocked[b+"\u0000"+a] = 1;
+    });
+    if (bad.length) return showErr("These pairs don't match names on the list: " + bad.join(" · "));
+
+    var map = draw(names, blocked);
+    if (!map) return showErr("There's no way to draw names with those pairs kept apart. Try removing a pair.");
+
+    var budget = $("budget").value.trim(), date = $("date").value.trim(), msg = $("msg").value.trim();
+    var state = { base: base, created: Date.now(), people: names.map(function(g){
+      var tok = encodeToken({ g: g, r: map[g], b: budget, d: date, m: msg });
+      return { name: g, link: base + "#" + tok, sent: false };
+    })};
+    map = null; // forget the plain matches
+    save(state); renderLinks(state);
+
+    function showErr(t){ err.textContent = t; err.classList.remove("hidden"); }
+  }
+
+  function renderLinks(state){
+    $("setup").classList.add("hidden"); $("results").classList.remove("hidden");
+    $("fileWarn").classList.toggle("hidden", /^https?:/i.test(state.base));
+    var ul = $("linkList"); ul.innerHTML = "";
+    state.people.forEach(function(p, idx){
+      var li = document.createElement("li"); if (p.sent) li.className = "sent";
+      var text = "🎅 *Surrey Opticians Secret Santa*\n\nHi " + p.name + "! Here's your private link. Tap it to see who you're buying for:\n\n" + p.link + "\n\n🤫 It's just for you, so please don't forward it.";
+      li.innerHTML =
+        '<div class="avatar"></div>' +
+        '<div class="who"><span class="nm"></span><small class="st"></small></div>' +
+        '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener">WhatsApp</a>' +
+        '<button class="btn btn-ghost btn-sm cp">Copy link</button>';
+      li.querySelector(".avatar").textContent = p.sent ? "✓" : p.name.charAt(0).toUpperCase();
+      li.querySelector(".nm").textContent = p.name;
+      li.querySelector(".st").textContent = p.sent ? "Sent" : "Not sent yet";
+      var wa = li.querySelector(".btn-wa");
+      wa.href = "https://wa.me/?text=" + encodeURIComponent(text);
+      wa.addEventListener("click", function(){ mark(idx); });
+      li.querySelector(".cp").addEventListener("click", function(e){
+        var b = e.currentTarget;
+        copy(text).then(function(ok){ b.textContent = ok ? "Copied ✓" : "Copy failed"; if (ok) mark(idx); setTimeout(function(){ b.textContent = "Copy link"; }, 1800); });
+      });
+      ul.appendChild(li);
+    });
+    $("doneMsg").classList.toggle("hidden", !state.people.every(function(p){ return p.sent; }));
+
+    function mark(i){ state.people[i].sent = true; save(state); setTimeout(function(){ renderLinks(state); }, 300); }
+  }
+
+  function copy(text){
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).then(function(){ return true; }, fallback);
+    return Promise.resolve(fallback());
+    function fallback(){ try { var t = document.createElement("textarea"); t.value = text; t.style.position="fixed"; t.style.opacity="0"; document.body.appendChild(t); t.select(); var ok = document.execCommand("copy"); t.remove(); return ok; } catch(e){ return false; } }
+  }
+  function save(s){ try { if (s) localStorage.setItem(STORE, JSON.stringify(s)); else localStorage.removeItem(STORE); } catch(e){} }
+  function load(){ try { return JSON.parse(localStorage.getItem(STORE) || "null"); } catch(e){ return null; } }
+})();
+</script>
+</body>
+</html>
